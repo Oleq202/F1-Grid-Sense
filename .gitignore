@@ -1,2 +1,5 @@
 venv
 data/f1_cache
+__pycache__
+build_log.txt
+f1_dataset.db
