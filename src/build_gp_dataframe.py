@@ -8,11 +8,14 @@ from fastf1_data_fetcher import (
     compute_tyre_degradation,
     fetch_session_data,
     fetch_weather_data,
+    find_round_for_location,
     get_championship_standings_before_race,
+    get_circuit_location,
     get_constructor_qualifying_form,
     get_estimate_difficulty_of_overtaking,
     get_recent_driver_form,
     get_session_info,
+    normalize_team_name,
 )
 
 
@@ -82,8 +85,10 @@ def build_gp_dataframe(year, grand_prix, history_years_back=5, overtaking_years_
     df = df.merge(_pivot_by_compound(degradation_df, 'DegSlope', 'DegSlope'), on='Driver', how='left')
 
     # --- Constructor qualifying form over recent rounds ---
+    df['TeamNameCanonical'] = df['TeamName'].map(normalize_team_name)
     constructor_form = get_constructor_qualifying_form(year, round_number, n_races=constructor_n_races)
-    df = df.merge(constructor_form, on='TeamName', how='left')
+    df = df.merge(constructor_form, on='TeamNameCanonical', how='left')
+    df = df.drop(columns=['TeamNameCanonical'])
 
     # --- Driver's recent race form (last 5 starts, any circuit) ---
     recent_form = get_recent_driver_form(year, round_number, n_races=5)
@@ -95,12 +100,16 @@ def build_gp_dataframe(year, grand_prix, history_years_back=5, overtaking_years_
     df = df.merge(constructor_points, on='TeamName', how='left')
 
     # --- Driver's historical qualifying pace at this circuit ---
+    circuit_location = get_circuit_location(year, grand_prix)
     history_by_driver = {drv: [] for drv in df['Driver']}
     for yr in range(year - 1, year - history_years_back - 1, -1):
+        past_round = find_round_for_location(yr, circuit_location)
+        if past_round is None:
+            continue
         try:
-            past_session = fetch_session_data(yr, grand_prix, 'Q', laps=False, telemetry=False)
+            past_session = fetch_session_data(yr, past_round, 'Q', laps=False, telemetry=False)
         except Exception as e:
-            print(f"Skipping {yr} {grand_prix}: {e}")
+            print(f"Skipping {yr} R{past_round} ({circuit_location}): {e}")
             continue
         past_results = past_session.results[['Abbreviation', 'Position']].dropna(subset=['Position'])
         pos_by_driver = dict(zip(past_results['Abbreviation'], past_results['Position']))
