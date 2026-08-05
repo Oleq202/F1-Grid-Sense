@@ -1,4 +1,5 @@
 numpy
 pandas
 fastf1
-sqlite3
+ipykernel
+seaborn

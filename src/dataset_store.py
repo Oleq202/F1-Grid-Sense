@@ -1,8 +1,9 @@
 import sqlite3
+from pathlib import Path
 
 import pandas as pd
 
-DEFAULT_DB_PATH = 'data/f1_dataset.db'
+DEFAULT_DB_PATH = Path(__file__).parent.parent / 'data' / 'f1_dataset.db'
 TABLE_NAME = 'gp_driver_rows'
 
 
