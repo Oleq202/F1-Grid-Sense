@@ -25,6 +25,70 @@ def fetch_session_data(year, grand_prix, session, laps=True, telemetry=False, we
 def fetch_event_schedule(year):
     return fastf1.get_event_schedule(year)
 
+
+def get_circuit_location(year, grand_prix):
+    event = fastf1.get_event(year, grand_prix)
+    return event['Location']
+
+
+def find_round_for_location(year, location):
+    schedule = fetch_event_schedule(year)
+    real_events = schedule[schedule['RoundNumber'] > 0]
+    match = real_events[real_events['Location'] == location]
+    if match.empty:
+        return None
+    return int(match.iloc[0]['RoundNumber'])
+
+TEAM_NAME_CANONICAL = {
+    'Force India': 'Racing Point',
+    'Sahara Force India': 'Racing Point',
+    'Racing Point': 'Racing Point',
+    'Racing Point BWT Mercedes': 'Racing Point',
+    'Aston Martin': 'Aston Martin',
+    'Renault': 'Alpine',
+    'Alpine': 'Alpine',
+    'Alpine F1 Team': 'Alpine',
+    'Toro Rosso': 'RB',
+    'Scuderia Toro Rosso': 'RB',
+    'AlphaTauri': 'RB',
+    'Scuderia AlphaTauri': 'RB',
+    'RB': 'RB',
+    'RB F1 Team': 'RB',
+    'Racing Bulls': 'RB',
+    'Visa Cash App RB': 'RB',
+    'Sauber': 'Sauber',
+    'Alfa Romeo': 'Sauber',
+    'Alfa Romeo Racing': 'Sauber',
+    'Alfa Romeo Racing ORLEN': 'Sauber',
+    'Stake F1 Team Kick Sauber': 'Sauber',
+    'Kick Sauber': 'Sauber',
+    'Audi': 'Sauber',
+}
+
+
+def normalize_team_name(team_name):
+    return TEAM_NAME_CANONICAL.get(team_name, team_name)
+
+
+def _collect_prior_events(year, upcoming_round, n_races, max_seasons_back=3):
+    events = []
+    yr = year
+    round_cutoff = upcoming_round
+    seasons_back = 0
+    while len(events) < n_races and seasons_back <= max_seasons_back:
+        schedule = fetch_event_schedule(yr)
+        past_events = schedule[(schedule['RoundNumber'] > 0) & (schedule['RoundNumber'] < round_cutoff)]
+        past_events = past_events.sort_values('RoundNumber', ascending=False)
+        for _, event in past_events.iterrows():
+            events.append((yr, int(event['RoundNumber'])))
+            if len(events) >= n_races:
+                break
+        yr -= 1
+        round_cutoff = 10_000
+        seasons_back += 1
+    return events
+
+
 def is_sprint_weekend(year, round_number):
     schedule = fetch_event_schedule(year)
     event_rows = schedule[schedule['RoundNumber'] == round_number]
@@ -151,36 +215,28 @@ def get_grid_positions(year, grand_prix):
 
 
 def get_constructor_qualifying_form(year, upcoming_round, n_races=5):
-    schedule = fetch_event_schedule(year)
-    past_events = schedule[schedule['RoundNumber'] < upcoming_round].tail(n_races)
+    events = _collect_prior_events(year, upcoming_round, n_races)
 
     results = []
-    for _, event in past_events.iterrows():
-        session = fetch_session_data(year, event['EventName'], 'Q', laps=False, telemetry=False)
+    for yr_e, rnd_e in events:
+        try:
+            session = fetch_session_data(yr_e, rnd_e, 'Q', laps=False, telemetry=False)
+        except Exception as e:
+            print(f"Skipping {yr_e} R{rnd_e} for constructor form: {e}")
+            continue
         quali_results = session.results[['TeamName', 'Position']].copy()
-        quali_results['Round'] = event['RoundNumber']
         results.append(quali_results)
 
+    if not results:
+        return pd.DataFrame(columns=['TeamNameCanonical', 'AvgQualiPos'])
+
     combined = pd.concat(results)
-    return combined.groupby('TeamName')['Position'].mean().reset_index(name='AvgQualiPos')
+    combined['TeamNameCanonical'] = combined['TeamName'].map(normalize_team_name)
+    return combined.groupby('TeamNameCanonical')['Position'].mean().reset_index(name='AvgQualiPos')
 
 
 def get_recent_driver_form(year, upcoming_round, n_races=5):
-    events = []
-    yr = year
-    round_cutoff = upcoming_round
-    seasons_back = 0
-    while len(events) < n_races and seasons_back <= 3:
-        schedule = fetch_event_schedule(yr)
-        past_events = schedule[(schedule['RoundNumber'] > 0) & (schedule['RoundNumber'] < round_cutoff)]
-        past_events = past_events.sort_values('RoundNumber', ascending=False)
-        for _, event in past_events.iterrows():
-            events.append((yr, int(event['RoundNumber'])))
-            if len(events) >= n_races:
-                break
-        yr -= 1
-        round_cutoff = 10_000
-        seasons_back += 1
+    events = _collect_prior_events(year, upcoming_round, n_races)
 
     results = []
     for yr_e, rnd_e in events:
@@ -199,8 +255,22 @@ def get_recent_driver_form(year, upcoming_round, n_races=5):
     return combined.groupby('Driver')['Position'].mean().reset_index(name='RecentFormAvgFinish')
 
 
+def _ergast_call_with_retry(fn, *args, max_wait=300, **kwargs):
+    wait = 10
+    while True:
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            if '429' in str(e) or 'Too Many Requests' in str(e):
+                print(f"  Ergast rate limited - waiting {wait}s before retrying...")
+                time.sleep(wait)
+                wait = min(wait * 2, max_wait)
+            else:
+                raise
+
+
 def get_championship_standings_before_race(year, round_number):
-    
+
     ergast = Ergast()
     empty = (
         pd.DataFrame(columns=['Driver', 'DriverPointsBeforeRace']),
@@ -210,11 +280,13 @@ def get_championship_standings_before_race(year, round_number):
     try:
         if round_number <= 1:
             prior_year = year - 1
-            driver_resp = ergast.get_driver_standings(season=prior_year)
-            constructor_resp = ergast.get_constructor_standings(season=prior_year)
+            driver_resp = _ergast_call_with_retry(ergast.get_driver_standings, season=prior_year)
+            constructor_resp = _ergast_call_with_retry(ergast.get_constructor_standings, season=prior_year)
         else:
-            driver_resp = ergast.get_driver_standings(season=year, round=round_number - 1)
-            constructor_resp = ergast.get_constructor_standings(season=year, round=round_number - 1)
+            driver_resp = _ergast_call_with_retry(ergast.get_driver_standings, season=year, round=round_number - 1)
+            constructor_resp = _ergast_call_with_retry(
+                ergast.get_constructor_standings, season=year, round=round_number - 1
+            )
     except Exception as e:
         print(f"No standings available before {year} R{round_number}: {e}")
         return empty
@@ -233,11 +305,19 @@ def get_championship_standings_before_race(year, round_number):
 
 
 def get_driver_circuit_qualifying_history(driver, grand_prix, year, years_back=5):
-    positions = []
+    try:
+        location = get_circuit_location(year, grand_prix)
+    except Exception as e:
+        print(f"Could not resolve circuit location for {year} {grand_prix}: {e}")
+        return None
 
+    positions = []
     for y in range(year - 1, year - years_back - 1, -1):
+        past_round = find_round_for_location(y, location)
+        if past_round is None:
+            continue
         try:
-            session = fetch_session_data(y, grand_prix, 'Q', laps=False, telemetry=False)
+            session = fetch_session_data(y, past_round, 'Q', laps=False, telemetry=False)
             row = session.results[session.results['Abbreviation'] == driver]
 
             if row.empty:
@@ -250,19 +330,28 @@ def get_driver_circuit_qualifying_history(driver, grand_prix, year, years_back=5
             positions.append(pos)
 
         except Exception as e:
-            print(f"Skipping {y} {grand_prix}: {e}")
+            print(f"Skipping {y} R{past_round} ({location}): {e}")
             continue
 
     return sum(positions) / len(positions) if positions else None
 
 
 def get_estimate_difficulty_of_overtaking(year, grand_prix, years_back=10):
+    try:
+        location = get_circuit_location(year, grand_prix)
+    except Exception as e:
+        print(f"Could not resolve circuit location for {year} {grand_prix}: {e}")
+        return None
+
     deltas = []
     for yr in range(year - 1, year - years_back - 1, -1):
+        past_round = find_round_for_location(yr, location)
+        if past_round is None:
+            continue
         try:
-            race = fetch_session_data(yr, grand_prix, 'R', laps=False, telemetry=False)
+            race = fetch_session_data(yr, past_round, 'R', laps=False, telemetry=False)
         except Exception as e:
-            print(f"Skipping {yr} {grand_prix}: {e}")
+            print(f"Skipping {yr} R{past_round} ({location}): {e}")
             continue
         df = race.results[['GridPosition', 'Position']].dropna()
         deltas.extend((df['Position'] - df['GridPosition']).abs().tolist())
