@@ -1,4 +1,3 @@
-import pandas as pd
 from dataset_store import load_dataset
 
 SOFT_VARIANTS = ['SUPERSOFT', 'ULTRASOFT', 'HYPERSOFT']
@@ -59,15 +58,20 @@ def load_clean_dataset():
     df.loc[no_grid, 'GridPosition'] = field_size[no_grid] + 1 
     df['GridPenalty'] = df['QualiPosition'] - df['GridPosition']
 
-    for col in ['LongRunPace_SOFT', 'DegSlope_SOFT', 'DegSlope_MEDIUM', 'FPDeltaToFastest',
-            'FP3Sector1', 'FP3Sector2', 'FP3Sector3']:
-        df[f'{col}_missing'] = df[col].isna()
-
     group_cols = ['Year', 'RoundNumber']
+
+    for col in ['LongRunPace_SOFT', 'DegSlope_SOFT', 'DegSlope_MEDIUM', 'FPDeltaToFastest']:
+        df[f'{col}_missing'] = df[col].isna().astype(int)
+
+    df['FP3Sectors_missing'] = df['FP3Sector1'].isna().astype(int)
+
+    df['RookieDriver'] = df['AvgCircuitQualiPos'].isna().astype(int)
+
     for col in ['FPDeltaToFastest', 'FP3Sector1', 'FP3Sector2', 'FP3Sector3',
             'LongRunPace_SOFT', 'DegSlope_SOFT', 'DegSlope_MEDIUM']:
         df[col] = df[col].fillna(df.groupby(group_cols)[col].transform('median'))
         df[col] = df[col].fillna(df[col].median()) 
+
 
     for col in ['AvgQualiPos', 'RecentFormAvgFinish', 'AvgCircuitQualiPos']:
         df[col] = df[col].fillna(df.groupby(group_cols)[col].transform(lambda s: s.quantile(0.75)))
@@ -76,21 +80,13 @@ def load_clean_dataset():
     df['DriverPointsBeforeRace'] = df['DriverPointsBeforeRace'].fillna(
         df.groupby(group_cols)['DriverPointsBeforeRace'].transform(lambda s: s.quantile(0.25))
     )
-    df['DriverPointsBeforeRace'] = df['DriverPointsBeforeRace'].fillna(df['DriverPointsBeforeRace'].quantile(0.25))
-
-    for col in ['FPDeltaToFastest', 'FP3Sector1', 'FP3Sector2', 'FP3Sector3',
-            'LongRunPace_SOFT', 'DegSlope_SOFT', 'DegSlope_MEDIUM']:
-        df[col] = df[col].fillna(df.groupby(group_cols)[col].transform('median'))
-        df[col] = df[col].fillna(df[col].median())
-
-    for col in ['AvgQualiPos', 'RecentFormAvgFinish', 'DriverPointsBeforeRace', 'AvgCircuitQualiPos']:
-        df[col] = df[col].fillna(df.groupby(group_cols)[col].transform(lambda s: s.quantile(0.75)))
-        df[col] = df[col].fillna(df[col].quantile(0.75))
 
     df['OvertakingDifficulty'] = df['OvertakingDifficulty'].fillna(
         df.groupby('Circuit')['OvertakingDifficulty'].transform('median')
     )
-    df['OvertakingDifficulty'] = df['OvertakingDifficulty'].fillna(df['OvertakingDifficulty'].median())
+
+    bool_cols = df.select_dtypes(include='bool').columns
+    df[bool_cols] = df[bool_cols].astype(int)
 
     return df, status
 
