@@ -35,6 +35,48 @@ def load_clean_dataset():
     status['Classified'] = status['Status'].apply(is_classified)
     df = df.merge(status[['Year', 'RoundNumber', 'Driver', 'Classified']],
               on=['Year', 'RoundNumber', 'Driver'], how='left')
+
+    df.sort_values(['Year', 'RoundNumber']).reset_index(drop=True)
+    df['_DNF'] = (~df['Classified']).astype(int)
+
+    circuit_race_dnf = (
+        df.groupby(['Circuit', 'Year', 'RoundNumber'])['_DNF']
+        .mean()
+        .reset_index()
+        .sort_values(['Circuit', 'Year', 'RoundNumber'])
+    )
+
+    circuit_race_dnf['CircuitDNFRate'] = (
+        circuit_race_dnf.groupby('Circuit', group_keys=False)['_DNF']
+        .apply(lambda s: s.shift().expanding().mean())
+    )
+    df = df.merge(
+        circuit_race_dnf[['Circuit', 'Year', 'RoundNumber', 'CircuitDNFRate']],
+        on=['Circuit', 'Year', 'RoundNumber'], how='left'
+    )
+
+    team_race_dnf = (
+        df.groupby(['TeamName', 'Year', 'RoundNumber'])['_DNF']
+        .mean()
+        .reset_index()
+        .sort_values(['TeamName', 'Year', 'RoundNumber'])
+    )
+    team_race_dnf['TeamDNFRate'] = (
+        team_race_dnf.groupby('TeamName', group_keys=False)['_DNF']
+        .apply(lambda s: s.shift().rolling(10, min_periods=1).mean())
+    )
+    df = df.merge(
+        team_race_dnf[['TeamName', 'Year', 'RoundNumber', 'TeamDNFRate']],
+        on=['TeamName', 'Year', 'RoundNumber'], how='left'
+    )
+
+    overall_dnf_rate = df['_DNF'].mean()
+    df['CircuitDNFRate'] = df['CircuitDNFRate'].fillna(overall_dnf_rate)
+    df['TeamDNFRate'] = df['TeamDNFRate'].fillna(overall_dnf_rate)
+ 
+    df = df.drop(columns=['_DNF'])
+
+    
     df = df[df['Classified']].drop(columns=['Classified'])
 
     df = df.drop(columns=['Status'])
@@ -45,7 +87,7 @@ def load_clean_dataset():
        'LongRunPace_SOFT', 'LongRunPace_MEDIUM', 'LongRunPace_HARD', 'LongRunPace_INTERMEDIATE', 'LongRunPace_WET',
        'DegSlope_SOFT', 'DegSlope_MEDIUM', 'DegSlope_HARD', 'DegSlope_INTERMEDIATE', 'DegSlope_WET',
        'AvgQualiPos', 'RecentFormAvgFinish', 'DriverPointsBeforeRace',
-       'ConstructorPointsBeforeRace', 'AvgCircuitQualiPos', 'OvertakingDifficulty', 
+       'ConstructorPointsBeforeRace', 'AvgCircuitQualiPos', 'TeamDNFRate', 'CircuitDNFRate', 'OvertakingDifficulty', 
        'AirTemp', 'TrackTemp', 'Humidity', 'Pressure', 'WindSpeed', 'Rainfall',
     ]
     df = df[new_order]
@@ -103,10 +145,10 @@ def load_clean_dataset():
     bool_cols = df.select_dtypes(include='bool').columns
     df[bool_cols] = df[bool_cols].astype(int)
 
-    return df, status
+    return df
 
 if __name__ == '__main__':
-    df, status = load_clean_dataset()
+    df = load_clean_dataset()
     print(f"Shape: {df.shape}")
     print(f"Columns: {list(df.columns)}")
     print("\nMissing data (%):")
