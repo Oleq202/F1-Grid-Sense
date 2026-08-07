@@ -1,8 +1,18 @@
+import re
+
+import pandas as pd
+
 from dataset_store import load_dataset
 
 SOFT_VARIANTS = ['SUPERSOFT', 'ULTRASOFT', 'HYPERSOFT']
 JUNK_COMPOUNDS = ['UNKNOWN', 'TEST_UNKNOWN', 'TEST', 'None', 'nan']
 
+def is_classified(s):
+    if pd.isna(s):
+        return False
+    if s == 'Finished' or s == 'Lapped':
+        return True
+    return bool(re.match(r'^\+\d+ Laps?$', s))
 
 def load_clean_dataset():
     df = load_dataset(db_path='../data/f1_dataset.db')
@@ -22,6 +32,11 @@ def load_clean_dataset():
     df = df.drop(columns=['GrandPrix'], errors='ignore')
 
     status = df[['Year', 'RoundNumber', 'Driver', 'Status']].copy()
+    status['Classified'] = status['Status'].apply(is_classified)
+    df = df.merge(status[['Year', 'RoundNumber', 'Driver', 'Classified']],
+              on=['Year', 'RoundNumber', 'Driver'], how='left')
+    df = df[df['Classified']].drop(columns=['Classified'])
+
     df = df.drop(columns=['Status'])
 
     new_order = ['Year', 'RoundNumber', 'Circuit', 'Driver', 'TeamName', 'QualiPosition',
