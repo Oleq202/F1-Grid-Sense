@@ -15,7 +15,7 @@ def is_classified(s):
     return bool(re.match(r'^\+\d+ Laps?$', s))
 
 def load_clean_dataset():
-    df = load_dataset(db_path='../data/f1_dataset.db')
+    df = load_dataset()
 
     junk_cols = [c for c in df.columns if any(x in c for x in JUNK_COMPOUNDS)]
     df = df.drop(columns=junk_cols)
