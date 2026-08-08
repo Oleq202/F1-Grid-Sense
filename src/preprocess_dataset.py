@@ -2,7 +2,7 @@ import re
 
 import pandas as pd
 
-from dataset_store import load_dataset
+from .dataset_store import load_dataset
 
 SOFT_VARIANTS = ['SUPERSOFT', 'ULTRASOFT', 'HYPERSOFT']
 JUNK_COMPOUNDS = ['UNKNOWN', 'TEST_UNKNOWN', 'TEST', 'None', 'nan']
