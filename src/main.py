@@ -33,7 +33,5 @@ def predict(year: int, round_number: int):
     _prediction_cache[key] = payload
     return payload
 
-# Must come AFTER the routes above, and "/" must be the mount point last —
-# StaticFiles(html=True) catches anything not already matched by a route.
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
