@@ -378,7 +378,7 @@
                                 data-type="number"
                                 onclick="sortBy('GridPosition', 'number')"
                             >
-                                Grid <span class="arrow"></span>
+                                Starting Grid <span class="arrow"></span>
                             </th>
                             <th
                                 class="sortable"
@@ -418,7 +418,7 @@
 
             let currentData = [];
             let sortState = {
-                key: "RaceFinishPosition",
+                key: "GridPosition",
                 type: "number",
                 direction: "asc",
             };
@@ -566,7 +566,7 @@
                     const payload = await res.json();
                     currentData = payload.results;
                     sortState = {
-                        key: "RaceFinishPosition",
+                        key: "GridPosition",
                         type: "number",
                         direction: "asc",
                     };
