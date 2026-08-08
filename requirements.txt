@@ -4,6 +4,6 @@ fastf1
 ipykernel
 seaborn
 scikit-learn
-xgboost
-lightgbm
 fastapi
+uvicorn[standard]
+scipy
