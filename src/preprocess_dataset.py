@@ -14,6 +14,13 @@ def is_classified(s):
         return True
     return bool(re.match(r'^\+\d+ Laps?$', s))
 
+def load_dnf_rows():
+    df = load_dataset()
+    classified = df['Status'].apply(is_classified)
+    dnf = df.loc[~classified, ['Year', 'RoundNumber', 'Driver', 'TeamName', 'GridPosition']].copy()
+    return dnf.reset_index(drop=True)
+
+
 def load_clean_dataset():
     df = load_dataset()
 

@@ -20,7 +20,7 @@ def get_selectable_races(df):
     return races[races['Year'] >= 2019].reset_index(drop=True)
 
 
-def predict_race(df, feature_cols, year, round_number):
+def predict_race(df, feature_cols, year, round_number, dnf_df=None):
     all_races = (
         df[['Year', 'RoundNumber']]
         .drop_duplicates()
@@ -53,8 +53,23 @@ def predict_race(df, feature_cols, year, round_number):
 
     metrics = compute_race_metrics(test_df)
 
+    records = result.to_dict(orient='records')
+
+    if dnf_df is not None:
+        race_dnfs = dnf_df[(dnf_df['Year'] == year) & (dnf_df['RoundNumber'] == round_number)]
+        for _, row in race_dnfs.iterrows():
+            grid = row['GridPosition']
+            records.append({
+                'Driver': row['Driver'],
+                'TeamName': row['TeamName'],
+                'GridPosition': grid if pd.notna(grid) else '-',
+                'RaceFinishPosition': '-',
+                'PredictedPosition': '-',
+                'PositionDelta': '-',
+            })
+
     return {
-        'results': result.to_dict(orient='records'),
+        'results': records,
         'metrics': metrics,
     }
 
