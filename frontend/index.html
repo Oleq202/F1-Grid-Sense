@@ -450,12 +450,14 @@
             }
 
             function deltaClass(delta) {
+                if (delta === "-") return "delta-zero";
                 if (delta > 0) return "delta-neg";
                 if (delta < 0) return "delta-pos";
                 return "delta-zero";
             }
 
             function formatDelta(delta) {
+                if (delta === "-") return "-";
                 if (delta === 0) return "0";
                 return delta > 0 ? `+${delta}` : `${delta}`;
             }
@@ -473,6 +475,12 @@
             function renderTable() {
                 const { key, type, direction } = sortState;
                 const sorted = [...currentData].sort((a, b) => {
+                    const aMissing = a[key] === "-";
+                    const bMissing = b[key] === "-";
+                    if (aMissing && bMissing) return 0;
+                    if (aMissing) return 1;
+                    if (bMissing) return -1;
+
                     let cmp;
                     if (type === "text") {
                         cmp = String(a[key]).localeCompare(String(b[key]));
