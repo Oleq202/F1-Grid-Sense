@@ -256,6 +256,24 @@
                 color: var(--text-dim);
             }
 
+            .dnf-row {
+                opacity: 0.6;
+            }
+
+            .dnf-row td:first-child::after {
+                content: "DNF";
+                margin-left: 8px;
+                font-family: "JetBrains Mono", monospace;
+                font-size: 10px;
+                font-weight: 700;
+                letter-spacing: 0.05em;
+                color: var(--off);
+                border: 1px solid var(--off);
+                border-radius: 2px;
+                padding: 1px 4px;
+                vertical-align: middle;
+            }
+
             th.sortable {
                 cursor: pointer;
                 user-select: none;
@@ -493,12 +511,17 @@
                 const tbody = document.querySelector("#resultsTable tbody");
                 tbody.innerHTML = "";
                 sorted.forEach((row) => {
+                    const isDnf = row.RaceFinishPosition === "-";
                     const tr = document.createElement("tr");
+                    if (isDnf) tr.classList.add("dnf-row");
+                    const predictedCell = isDnf
+                        ? `<span title="Didn't finish the race - predicted position among the full field, as if they had">${row.PredictedPosition}</span>`
+                        : row.PredictedPosition;
                     tr.innerHTML = `
           <td>${row.Driver}</td>
           <td>${row.TeamName}</td>
           <td>${row.GridPosition}</td>
-          <td>${row.PredictedPosition}</td>
+          <td>${predictedCell}</td>
           <td>${row.RaceFinishPosition}</td>
           <td class="${deltaClass(row.PositionDelta)}">${formatDelta(row.PositionDelta)}</td>
         `;

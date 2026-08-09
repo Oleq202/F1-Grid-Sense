@@ -38,39 +38,38 @@ def predict_race(df, feature_cols, year, round_number, full_df=None):
 
     train_races = all_races.iloc[:target_idx]
     train_df = df.merge(train_races, on=['Year', 'RoundNumber'], how='inner')
-    test_df = df[(df['Year'] == year) & (df['RoundNumber'] == round_number)].copy()
 
     model = make_model()
     model.fit(train_df[feature_cols], train_df['RaceFinishPosition'])
-    preds = model.predict(test_df[feature_cols])
-
-    test_df['PredictedScore'] = preds
-    test_df['PredictedPosition'] = rankdata(preds, method='ordinal').astype(int)
-    test_df['PositionDelta'] = test_df['RaceFinishPosition'] - test_df['PredictedPosition']
-
-    result = test_df[['Driver', 'TeamName', 'GridPosition', 'RaceFinishPosition',
-                       'PredictedPosition', 'PositionDelta']].sort_values('RaceFinishPosition')
-
-    metrics = compute_race_metrics(test_df)
-
-    records = result.to_dict(orient='records')
 
     if full_df is not None:
-        race_full = full_df[(full_df['Year'] == year) & (full_df['RoundNumber'] == round_number)]
-        race_dnfs = race_full[~race_full['Classified']]
-        if not race_dnfs.empty:
-            dnf_preds = model.predict(race_dnfs[feature_cols])
-            for (_, row), score in zip(race_dnfs.iterrows(), dnf_preds):
-                predicted_position = int((preds < score).sum()) + 1
-                grid = row['GridPosition']
-                records.append({
-                    'Driver': row['Driver'],
-                    'TeamName': row['TeamName'],
-                    'GridPosition': grid if pd.notna(grid) else '-',
-                    'RaceFinishPosition': '-',
-                    'PredictedPosition': predicted_position,
-                    'PositionDelta': '-',
-                })
+        race_field = full_df[(full_df['Year'] == year) & (full_df['RoundNumber'] == round_number)].copy()
+    else:
+        race_field = df[(df['Year'] == year) & (df['RoundNumber'] == round_number)].copy()
+        race_field['Classified'] = True
+
+    preds = model.predict(race_field[feature_cols])
+    race_field['PredictedPosition'] = rankdata(preds, method='ordinal').astype(int)
+
+    classified = race_field[race_field['Classified']].copy()
+    classified['PositionDelta'] = classified['RaceFinishPosition'] - classified['PredictedPosition']
+
+    metrics = compute_race_metrics(classified)
+
+    records = classified[['Driver', 'TeamName', 'GridPosition', 'RaceFinishPosition',
+                           'PredictedPosition', 'PositionDelta']].sort_values('RaceFinishPosition').to_dict(orient='records')
+
+    dnf = race_field[~race_field['Classified']]
+    for _, row in dnf.iterrows():
+        grid = row['GridPosition']
+        records.append({
+            'Driver': row['Driver'],
+            'TeamName': row['TeamName'],
+            'GridPosition': grid if pd.notna(grid) else '-',
+            'RaceFinishPosition': '-',
+            'PredictedPosition': int(row['PredictedPosition']),
+            'PositionDelta': '-',
+        })
 
     return {
         'results': records,
