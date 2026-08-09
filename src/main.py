@@ -5,12 +5,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .predict import get_selectable_races, predict_race
-from .preprocess_dataset import load_clean_dataset
+from .preprocess_dataset import load_clean_dataset, load_dnf_rows
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 df = load_clean_dataset()
+dnf_df = load_dnf_rows()
 non_feature_cols = ['Year', 'RoundNumber', 'Circuit', 'Driver', 'TeamName', 'RaceFinishPosition']
 feature_cols = [c for c in df.columns if c not in non_feature_cols]
 
@@ -27,7 +28,7 @@ def predict(year: int, round_number: int):
     key = (year, round_number)
     if key in _prediction_cache:
         return _prediction_cache[key]
-    payload = predict_race(df, feature_cols, year, round_number)
+    payload = predict_race(df, feature_cols, year, round_number, dnf_df=dnf_df)
     if payload is None:
         raise HTTPException(status_code=404, detail="Race not found")
     _prediction_cache[key] = payload
