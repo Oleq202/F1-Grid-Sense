@@ -20,7 +20,7 @@ def get_selectable_races(df):
     return races[races['Year'] >= 2019].reset_index(drop=True)
 
 
-def predict_race(df, feature_cols, year, round_number, dnf_df=None):
+def predict_race(df, feature_cols, year, round_number, full_df=None):
     all_races = (
         df[['Year', 'RoundNumber']]
         .drop_duplicates()
@@ -55,18 +55,22 @@ def predict_race(df, feature_cols, year, round_number, dnf_df=None):
 
     records = result.to_dict(orient='records')
 
-    if dnf_df is not None:
-        race_dnfs = dnf_df[(dnf_df['Year'] == year) & (dnf_df['RoundNumber'] == round_number)]
-        for _, row in race_dnfs.iterrows():
-            grid = row['GridPosition']
-            records.append({
-                'Driver': row['Driver'],
-                'TeamName': row['TeamName'],
-                'GridPosition': grid if pd.notna(grid) else '-',
-                'RaceFinishPosition': '-',
-                'PredictedPosition': '-',
-                'PositionDelta': '-',
-            })
+    if full_df is not None:
+        race_full = full_df[(full_df['Year'] == year) & (full_df['RoundNumber'] == round_number)]
+        race_dnfs = race_full[~race_full['Classified']]
+        if not race_dnfs.empty:
+            dnf_preds = model.predict(race_dnfs[feature_cols])
+            for (_, row), score in zip(race_dnfs.iterrows(), dnf_preds):
+                predicted_position = int((preds < score).sum()) + 1
+                grid = row['GridPosition']
+                records.append({
+                    'Driver': row['Driver'],
+                    'TeamName': row['TeamName'],
+                    'GridPosition': grid if pd.notna(grid) else '-',
+                    'RaceFinishPosition': '-',
+                    'PredictedPosition': predicted_position,
+                    'PositionDelta': '-',
+                })
 
     return {
         'results': records,

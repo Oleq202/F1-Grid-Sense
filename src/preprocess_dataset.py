@@ -14,14 +14,8 @@ def is_classified(s):
         return True
     return bool(re.match(r'^\+\d+ Laps?$', s))
 
-def load_dnf_rows():
-    df = load_dataset()
-    classified = df['Status'].apply(is_classified)
-    dnf = df.loc[~classified, ['Year', 'RoundNumber', 'Driver', 'TeamName', 'GridPosition']].copy()
-    return dnf.reset_index(drop=True)
 
-
-def load_clean_dataset():
+def _engineer_dataset():
     df = load_dataset()
 
     junk_cols = [c for c in df.columns if any(x in c for x in JUNK_COMPOUNDS)]
@@ -80,12 +74,8 @@ def load_clean_dataset():
     overall_dnf_rate = df['_DNF'].mean()
     df['CircuitDNFRate'] = df['CircuitDNFRate'].fillna(overall_dnf_rate)
     df['TeamDNFRate'] = df['TeamDNFRate'].fillna(overall_dnf_rate)
- 
+
     df = df.drop(columns=['_DNF'])
-
-    
-    df = df[df['Classified']].drop(columns=['Classified'])
-
     df = df.drop(columns=['Status'])
 
     new_order = ['Year', 'RoundNumber', 'Circuit', 'Driver', 'TeamName', 'QualiPosition',
@@ -94,8 +84,8 @@ def load_clean_dataset():
        'LongRunPace_SOFT', 'LongRunPace_MEDIUM', 'LongRunPace_HARD', 'LongRunPace_INTERMEDIATE', 'LongRunPace_WET',
        'DegSlope_SOFT', 'DegSlope_MEDIUM', 'DegSlope_HARD', 'DegSlope_INTERMEDIATE', 'DegSlope_WET',
        'AvgQualiPos', 'RecentFormAvgFinish', 'DriverPointsBeforeRace',
-       'ConstructorPointsBeforeRace', 'AvgCircuitQualiPos', 'TeamDNFRate', 'CircuitDNFRate', 'OvertakingDifficulty', 
-       'AirTemp', 'TrackTemp', 'Humidity', 'Pressure', 'WindSpeed', 'Rainfall',
+       'ConstructorPointsBeforeRace', 'AvgCircuitQualiPos', 'TeamDNFRate', 'CircuitDNFRate', 'OvertakingDifficulty',
+       'AirTemp', 'TrackTemp', 'Humidity', 'Pressure', 'WindSpeed', 'Rainfall', 'Classified',
     ]
     df = df[new_order]
 
@@ -111,15 +101,13 @@ def load_clean_dataset():
     ]
     df = df.drop(columns=DROP_COLS)
 
-    df = df.dropna(subset=['RaceFinishPosition'])
-
     field_size = df.groupby(['Year', 'RoundNumber'])['GridPosition'].transform('max')
     pit_lane_start = df['GridPosition'] == 0
     has_grid = df['QualiPosition'].isna() & (df['GridPosition'] > 0)
     df.loc[has_grid, 'QualiPosition'] = df.loc[has_grid, 'GridPosition']
     no_grid = df['QualiPosition'].isna() & pit_lane_start
     df.loc[no_grid, 'QualiPosition'] = field_size[no_grid] + 1
-    df.loc[no_grid, 'GridPosition'] = field_size[no_grid] + 1 
+    df.loc[no_grid, 'GridPosition'] = field_size[no_grid] + 1
     df['GridPenalty'] = df['QualiPosition'] - df['GridPosition']
 
     group_cols = ['Year', 'RoundNumber']
@@ -134,8 +122,7 @@ def load_clean_dataset():
     for col in ['FPDeltaToFastest', 'FP3Sector1', 'FP3Sector2', 'FP3Sector3',
             'LongRunPace_SOFT', 'DegSlope_SOFT', 'DegSlope_MEDIUM']:
         df[col] = df[col].fillna(df.groupby(group_cols)[col].transform('median'))
-        df[col] = df[col].fillna(df[col].median()) 
-
+        df[col] = df[col].fillna(df[col].median())
 
     for col in ['AvgQualiPos', 'RecentFormAvgFinish', 'AvgCircuitQualiPos']:
         df[col] = df[col].fillna(df.groupby(group_cols)[col].transform(lambda s: s.quantile(0.75)))
@@ -149,10 +136,23 @@ def load_clean_dataset():
         df.groupby('Circuit')['OvertakingDifficulty'].transform('median')
     )
 
-    bool_cols = df.select_dtypes(include='bool').columns
+    bool_cols = df.select_dtypes(include='bool').columns.drop('Classified', errors='ignore')
     df[bool_cols] = df[bool_cols].astype(int)
 
     return df
+
+
+def load_clean_dataset():
+    df = _engineer_dataset()
+    df = df[df['Classified']].drop(columns=['Classified'])
+    df = df.dropna(subset=['RaceFinishPosition'])
+    return df.reset_index(drop=True)
+
+
+def load_full_dataset():
+    df = _engineer_dataset()
+    return df.reset_index(drop=True)
+
 
 if __name__ == '__main__':
     df = load_clean_dataset()
