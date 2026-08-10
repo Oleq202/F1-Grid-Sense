@@ -112,7 +112,7 @@ def _engineer_dataset():
     df.loc[has_grid, 'QualiPosition'] = df.loc[has_grid, 'GridPosition']
     no_grid = df['QualiPosition'].isna() & pit_lane_start
     df.loc[no_grid, 'QualiPosition'] = field_size[no_grid] + 1
-    df.loc[no_grid, 'GridPosition'] = field_size[no_grid] + 1
+    df.loc[pit_lane_start, 'GridPosition'] = field_size[pit_lane_start] + 1
     df['GridPenalty'] = df['QualiPosition'] - df['GridPosition']
 
     group_cols = ['Year', 'RoundNumber']
