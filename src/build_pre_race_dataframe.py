@@ -50,7 +50,11 @@ def build_pre_race_dataframe(year, grand_prix, history_years_back=5, overtaking_
 
     df = q_session.results[['Abbreviation', 'TeamName', 'Position']].copy()
     df = df.rename(columns={'Abbreviation': 'Driver', 'Position': 'QualiPosition'})
-    df['GridPosition'] = df['QualiPosition']  
+    df['GridPosition'] = df['QualiPosition']
+    field_size = df['GridPosition'].max()
+    pit_lane_start = df['GridPosition'] == 0
+    df.loc[pit_lane_start, 'GridPosition'] = field_size + 1
+    df.loc[pit_lane_start, 'QualiPosition'] = field_size + 1
     df['GridPenalty'] = 0
 
     fp_delta = compute_fp_delta({fp: sess.laps for fp, sess in fp_sessions.items()})
