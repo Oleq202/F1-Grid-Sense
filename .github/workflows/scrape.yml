@@ -1,0 +1,66 @@
+name: F1 Data Scraper
+
+on:
+    schedule:
+        - cron: "0 20 * * 6"
+        - cron: "0 18 * * 0"
+    workflow_dispatch:
+
+jobs:
+    scrape-qualifying:
+        runs-on: ubuntu-latest
+        if: github.event.schedule == '0 20 * * 6' || github.event_name == 'workflow_dispatch'
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
+
+            - name: Install dependencies
+              run: |
+                  pip install -r requirements.txt
+
+            - name: Run qualifying scraper
+              run: |
+                  python src/scrape_qualifying.py
+
+            - name: Commit and push changes
+              run: |
+                  git config --local user.email "github-actions[bot]@users.noreply.github.com"
+                  git config --local user.name "github-actions[bot]"
+                  git add data/f1_dataset.db
+                  git diff --staged --quiet || git commit -m "chore: update pre-race data after qualifying"
+                  git push
+
+    update-race-results:
+        runs-on: ubuntu-latest
+        if: github.event.schedule == '0 18 * * 0' || github.event_name == 'workflow_dispatch'
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
+
+            - name: Install dependencies
+              run: |
+                  pip install -r requirements.txt
+
+            - name: Run race results updater
+              run: |
+                  python src/update_race_results.py
+
+            - name: Commit and push changes
+              run: |
+                  git config --local user.email "github-actions[bot]@users.noreply.github.com"
+                  git config --local user.name "github-actions[bot]"
+                  git add data/f1_dataset.db
+                  git diff --staged --quiet || git commit -m "chore: update race results after race"
+                  git push
