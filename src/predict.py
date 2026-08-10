@@ -51,30 +51,46 @@ def predict_race(df, feature_cols, year, round_number, full_df=None):
     preds = model.predict(race_field[feature_cols])
     race_field['PredictedPosition'] = rankdata(preds, method='ordinal').astype(int)
 
-    classified = race_field[race_field['Classified']].copy()
-    classified['PositionDelta'] = classified['RaceFinishPosition'] - classified['PredictedPosition']
+    is_complete = race_field['IsComplete'].iloc[0] if 'IsComplete' in race_field.columns else True
+    has_race_results = race_field['RaceFinishPosition'].notna().any()
 
-    metrics = compute_race_metrics(classified)
+    if is_complete and has_race_results:
+        classified = race_field[race_field['Classified']].copy()
+        classified['PositionDelta'] = classified['RaceFinishPosition'] - classified['PredictedPosition']
 
-    records = classified[['Driver', 'TeamName', 'GridPosition', 'RaceFinishPosition',
-                           'PredictedPosition', 'PositionDelta']].sort_values('RaceFinishPosition').to_dict(orient='records')
+        metrics = compute_race_metrics(classified)
 
-    dnf = race_field[~race_field['Classified']]
-    for _, row in dnf.iterrows():
-        grid = row['GridPosition']
-        records.append({
-            'Driver': row['Driver'],
-            'TeamName': row['TeamName'],
-            'GridPosition': grid if pd.notna(grid) else '-',
-            'RaceFinishPosition': '-',
-            'PredictedPosition': int(row['PredictedPosition']),
-            'PositionDelta': '-',
-        })
+        records = classified[['Driver', 'TeamName', 'GridPosition', 'RaceFinishPosition',
+                               'PredictedPosition', 'PositionDelta']].sort_values('RaceFinishPosition').to_dict(orient='records')
 
-    return {
-        'results': records,
-        'metrics': metrics,
-    }
+        dnf = race_field[~race_field['Classified']]
+        for _, row in dnf.iterrows():
+            grid = row['GridPosition']
+            records.append({
+                'Driver': row['Driver'],
+                'TeamName': row['TeamName'],
+                'GridPosition': grid if pd.notna(grid) else '-',
+                'RaceFinishPosition': '-',
+                'PredictedPosition': int(row['PredictedPosition']),
+                'PositionDelta': '-',
+            })
+
+        return {
+            'results': records,
+            'metrics': metrics,
+            'is_complete': True,
+        }
+    else:
+        # Race hasn't happened yet - return predictions only
+        records = race_field[['Driver', 'TeamName', 'GridPosition', 'QualiPosition',
+                               'PredictedPosition']].sort_values('PredictedPosition').to_dict(orient='records')
+
+        return {
+            'results': records,
+            'metrics': None,
+            'is_complete': False,
+            'message': 'Race has not yet occurred - showing predicted finishing order based on qualifying data',
+        }
 
 
 def compute_race_metrics(test_df: pd.DataFrame) -> dict:

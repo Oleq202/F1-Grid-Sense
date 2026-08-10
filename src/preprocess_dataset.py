@@ -87,6 +87,11 @@ def _engineer_dataset():
        'ConstructorPointsBeforeRace', 'AvgCircuitQualiPos', 'TeamDNFRate', 'CircuitDNFRate', 'OvertakingDifficulty',
        'AirTemp', 'TrackTemp', 'Humidity', 'Pressure', 'WindSpeed', 'Rainfall', 'Classified',
     ]
+    
+    if 'IsComplete' in df.columns:
+        new_order.append('IsComplete')
+    
+    new_order = [col for col in new_order if col in df.columns]
     df = df[new_order]
 
     DROP_COLS = [
