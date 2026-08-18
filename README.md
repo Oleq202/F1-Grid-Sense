@@ -1,8 +1,13 @@
 # F1 Race Predictor
 
+[![Backend](https://img.shields.io/badge/Backend-FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Model](https://img.shields.io/badge/Model-scikit--learn-F7931E?logo=scikitlearn&logoColor=white)](https://scikit-learn.org/)
+[![Data](https://img.shields.io/badge/Data-Pandas-150458?logo=pandas&logoColor=white)](https://pandas.pydata.org/)
+[![Database](https://img.shields.io/badge/Database-SQLite-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
+
 Predicts Formula 1 race finishing order from pre-race data (grid position, driver/team season form, DNF rates, etc.), then compares the prediction against what actually happened. Built on ~145 non-sprint races (2018–present) pulled via [FastF1](https://github.com/theOehrly/Fast-F1) into a local SQLite dataset.
 
-Pick a season and race, and the app trains a model using only races that happened *before* it, predicts that race's finishing order, and shows how close it got.
+Pick a season and race, and the app trains a model using only races that happened _before_ it, predicts that race's finishing order, and shows how close it got.
 
 ## How it works
 
@@ -53,9 +58,9 @@ Then open `http://127.0.0.1:8000/` in a browser.
 
 ## API
 
-| Endpoint | Description |
-|---|---|
-| `GET /races` | List of selectable races (2019+) with year, round, and circuit |
+| Endpoint                                | Description                                                              |
+| --------------------------------------- | ------------------------------------------------------------------------ |
+| `GET /races`                            | List of selectable races (2019+) with year, round, and circuit           |
 | `GET /predict?year=YYYY&round_number=N` | Predicted vs actual finishing order for that race, plus accuracy metrics |
 
 ## Notes / limitations
