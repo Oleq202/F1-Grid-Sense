@@ -1,22 +1,40 @@
 import fastf1
 import pandas as pd
 
-from fastf1_data_fetcher import (
-    compute_fp_delta,
-    compute_long_run_pace,
-    compute_sector_pace,
-    compute_tyre_degradation,
-    fetch_session_data,
-    fetch_weather_data,
-    find_round_for_location,
-    get_championship_standings_before_race,
-    get_circuit_location,
-    get_constructor_qualifying_form,
-    get_estimate_difficulty_of_overtaking,
-    get_recent_driver_form,
-    get_session_info,
-    normalize_team_name,
-)
+try:
+    from .fastf1_data_fetcher import (
+        compute_fp_delta,
+        compute_long_run_pace,
+        compute_sector_pace,
+        compute_tyre_degradation,
+        fetch_session_data,
+        fetch_weather_data,
+        find_round_for_location,
+        get_championship_standings_before_race,
+        get_circuit_location,
+        get_constructor_qualifying_form,
+        get_estimate_difficulty_of_overtaking,
+        get_recent_driver_form,
+        get_session_info,
+        normalize_team_name,
+    )
+except (ImportError, ValueError):
+    from fastf1_data_fetcher import (
+        compute_fp_delta,
+        compute_long_run_pace,
+        compute_sector_pace,
+        compute_tyre_degradation,
+        fetch_session_data,
+        fetch_weather_data,
+        find_round_for_location,
+        get_championship_standings_before_race,
+        get_circuit_location,
+        get_constructor_qualifying_form,
+        get_estimate_difficulty_of_overtaking,
+        get_recent_driver_form,
+        get_session_info,
+        normalize_team_name,
+    )
 
 
 def _resolve_round_number(year, grand_prix):

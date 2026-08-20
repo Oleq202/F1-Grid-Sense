@@ -5,11 +5,24 @@ on:
         - cron: "0 20 * * 6"
         - cron: "0 18 * * 0"
     workflow_dispatch:
+        inputs:
+            job:
+                description: "Job to run"
+                required: true
+                default: "all"
+                type: choice
+                options:
+                    - "all"
+                    - "scrape-qualifying"
+                    - "update-race-results"
+
+permissions:
+    contents: write
 
 jobs:
     scrape-qualifying:
         runs-on: ubuntu-latest
-        if: github.event.schedule == '0 20 * * 6' || github.event_name == 'workflow_dispatch'
+        if: github.event.schedule == '0 20 * * 6' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'all' || inputs.job == 'scrape-qualifying'))
 
         steps:
             - name: Checkout repository
@@ -33,12 +46,16 @@ jobs:
                   git config --local user.email "github-actions[bot]@users.noreply.github.com"
                   git config --local user.name "github-actions[bot]"
                   git add data/f1_dataset.db
-                  git diff --staged --quiet || git commit -m "chore: update pre-race data after qualifying"
-                  git push
+                  if ! git diff --staged --quiet; then
+                    git commit -m "chore: update pre-race data after qualifying"
+                    git pull --rebase origin main
+                    git push
+                  fi
 
     update-race-results:
         runs-on: ubuntu-latest
-        if: github.event.schedule == '0 18 * * 0' || github.event_name == 'workflow_dispatch'
+        needs: [scrape-qualifying]
+        if: always() && !cancelled() && (needs.scrape-qualifying.result == 'success' || needs.scrape-qualifying.result == 'skipped') && (github.event.schedule == '0 18 * * 0' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'all' || inputs.job == 'update-race-results')))
 
         steps:
             - name: Checkout repository
@@ -62,5 +79,8 @@ jobs:
                   git config --local user.email "github-actions[bot]@users.noreply.github.com"
                   git config --local user.name "github-actions[bot]"
                   git add data/f1_dataset.db
-                  git diff --staged --quiet || git commit -m "chore: update race results after race"
-                  git push
+                  if ! git diff --staged --quiet; then
+                    git commit -m "chore: update race results after race"
+                    git pull --rebase origin main
+                    git push
+                  fi

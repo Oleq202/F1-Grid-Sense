@@ -3,11 +3,16 @@ import pandas as pd
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.fastf1_data_fetcher import fetch_event_schedule, is_sprint_weekend
-from src.build_pre_race_dataframe import build_pre_race_dataframe
-from src.dataset_store import save_pre_race_dataframe, get_stored_keys
+try:
+    from src.fastf1_data_fetcher import fetch_event_schedule, is_sprint_weekend
+    from src.build_pre_race_dataframe import build_pre_race_dataframe
+    from src.dataset_store import save_pre_race_dataframe, get_stored_keys
+except (ImportError, ValueError):
+    from fastf1_data_fetcher import fetch_event_schedule, is_sprint_weekend
+    from build_pre_race_dataframe import build_pre_race_dataframe
+    from dataset_store import save_pre_race_dataframe, get_stored_keys
 
 
 def scrape_next_race():
@@ -17,7 +22,7 @@ def scrape_next_race():
     schedule = fetch_event_schedule(current_year)
     real_events = schedule[(schedule['RoundNumber'] > 0)]
     
-    upcoming = real_events[real_events['EventDate'] > today]
+    upcoming = real_events[real_events['EventDate'] >= today]
     
     if upcoming.empty:
         print("No upcoming races found")

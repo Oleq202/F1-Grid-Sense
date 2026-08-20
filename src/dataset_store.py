@@ -90,7 +90,10 @@ def save_pre_race_dataframe(df, db_path=DEFAULT_DB_PATH):
 
 
 def update_race_results(year, round_number, db_path=DEFAULT_DB_PATH):
-    from fastf1_data_fetcher import fetch_session_data
+    try:
+        from src.fastf1_data_fetcher import fetch_session_data
+    except (ImportError, ValueError):
+        from fastf1_data_fetcher import fetch_session_data
     
     conn = init_db(db_path)
     
@@ -123,6 +126,13 @@ def update_race_results(year, round_number, db_path=DEFAULT_DB_PATH):
                 WHERE Year = ? AND RoundNumber = ? AND Driver = ?
             ''', (row['GridPosition'], grid_penalty, finish_pos, status, year, round_number, driver))
         
+        # Ensure any remaining rows for this race (e.g. DNS / withdrawn drivers) are also marked complete
+        conn.execute(f'''
+            UPDATE {TABLE_NAME}
+            SET IsComplete = 1
+            WHERE Year = ? AND RoundNumber = ? AND IsComplete = 0
+        ''', (year, round_number))
+
         conn.commit()
         print(f"Updated race results for {year} R{round_number}")
         return True

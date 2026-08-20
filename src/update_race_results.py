@@ -4,15 +4,18 @@ import sys
 from pathlib import Path
 
 # Add parent directory to path for direct script execution
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.fastf1_data_fetcher import fetch_event_schedule, is_sprint_weekend
-from src.dataset_store import update_race_results, get_incomplete_races
+try:
+    from src.fastf1_data_fetcher import fetch_event_schedule, is_sprint_weekend
+    from src.dataset_store import update_race_results, get_incomplete_races
+except (ImportError, ValueError):
+    from fastf1_data_fetcher import fetch_event_schedule, is_sprint_weekend
+    from dataset_store import update_race_results, get_incomplete_races
 
 
 def update_completed_races():
     today = pd.Timestamp(datetime.now().date())
-    current_year = today.year
     
     incomplete = get_incomplete_races()
     
@@ -20,9 +23,17 @@ def update_completed_races():
         print("No incomplete races to update")
         return
     
-    schedule = fetch_event_schedule(current_year)
+    schedules = {}
     
     for year, round_num in incomplete:
+        if year not in schedules:
+            try:
+                schedules[year] = fetch_event_schedule(year)
+            except Exception as e:
+                print(f"Failed to fetch schedule for {year}: {e}")
+                continue
+
+        schedule = schedules[year]
         if is_sprint_weekend(year, round_num):
             print(f"Skipping {year} R{round_num} (sprint weekend)")
             continue

@@ -1,3 +1,4 @@
+from pathlib import Path
 import time
 
 import fastf1
@@ -6,7 +7,9 @@ import pandas as pd
 from fastf1.ergast import Ergast
 from fastf1.exceptions import RateLimitExceededError
 
-fastf1.Cache.enable_cache('data/f1_cache')
+CACHE_DIR = Path(__file__).resolve().parent.parent / 'data' / 'f1_cache'
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
+fastf1.Cache.enable_cache(str(CACHE_DIR))
 
 def fetch_session_data(year, grand_prix, session, laps=True, telemetry=False, weather=True, messages=False):
     
